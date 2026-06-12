@@ -1,19 +1,30 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-async function databaseUrl() {
+const defaultDatabaseUrl = "file:./dev.db";
+
+async function ensureDatabaseUrl() {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+
+  let env = "";
   try {
-    const env = await fs.readFile(".env", "utf8");
+    env = await fs.readFile(".env", "utf8");
     const match = env.match(/^DATABASE_URL\s*=\s*["']?([^"'\r\n]+)["']?/m);
     if (match) return match[1];
-  } catch {
-    // Prisma will report missing configuration after this preparation step.
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
   }
-  return "";
+
+  const separator = env.length > 0 && !env.endsWith("\n") ? "\n" : "";
+  await fs.appendFile(
+    ".env",
+    `${separator}DATABASE_URL="${defaultDatabaseUrl}"\n`,
+    "utf8",
+  );
+  return defaultDatabaseUrl;
 }
 
-const url = await databaseUrl();
+const url = await ensureDatabaseUrl();
 if (url.startsWith("file:")) {
   const configuredPath = url.slice("file:".length);
   const databasePath = path.isAbsolute(configuredPath)

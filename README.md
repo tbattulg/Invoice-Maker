@@ -34,9 +34,10 @@ Reliable bulk email delivery is not included because it requires a server-side e
 
 ```powershell
 npm.cmd install
-npm.cmd run db:migrate
 npm.cmd run dev
 ```
+
+The first install creates a local `.env` with the default SQLite database URL when one is not already configured, then applies the included migrations.
 
 Open `http://localhost:3000`.
 
