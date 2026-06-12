@@ -81,7 +81,7 @@ function invoiceTemplate(value: string): InvoiceTemplate {
 
 function businessLogoDataUrl(value: string): string {
   if (!value) return "";
-  if (value.length > 1_050_000) throw new Error("The business logo is too large.");
+  if (value.length > 7_100_000) throw new Error("The business logo must be smaller than 5 MB.");
   if (!/^data:image\/(?:png|jpeg);base64,[a-z0-9+/=]+$/i.test(value)) {
     throw new Error("The business logo must be a PNG or JPG image.");
   }

@@ -544,8 +544,8 @@ export function InvoiceWorkspace({
       input.value = "";
       return;
     }
-    if (file.size > 750 * 1024) {
-      showToast("error", "Logo is too large", "Choose an image smaller than 750 KB.");
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("error", "Logo is too large", "Choose an image smaller than 5 MB.");
       input.value = "";
       return;
     }
@@ -855,7 +855,7 @@ export function InvoiceWorkspace({
                 </div>
                 <div className="logo-setting-copy">
                   <strong>Business logo</strong>
-                  <span>PNG or JPG, up to 750 KB.</span>
+                  <span>PNG or JPG, up to 5 MB.</span>
                   <div className="logo-actions">
                     <label className="secondary-button logo-upload">{settingsForm.logoDataUrl ? "Replace logo" : "Upload logo"}<input accept="image/png,image/jpeg" type="file" onChange={uploadBusinessLogo} /></label>
                     {settingsForm.logoDataUrl && <button className="icon-button danger" type="button" title="Remove logo" aria-label="Remove business logo" onClick={() => setSettingsForm({ ...settingsForm, logoDataUrl: "" })}><X size={17} /></button>}
