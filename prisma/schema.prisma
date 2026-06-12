@@ -1,0 +1,253 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  passwordSalt String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspace Workspace?
+  sessions  Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Workspace {
+  id                String   @id @default(cuid())
+  ownerId           String   @unique
+  businessName      String
+  businessEmail     String
+  businessPhone     String   @default("")
+  businessAddress   String   @default("")
+  brandColor        String   @default("#176b5b")
+  defaultCurrency   String   @default("USD")
+  defaultTerms      String   @default("")
+  defaultNotes      String   @default("")
+  invoicePrefix     String   @default("INV")
+  nextInvoiceNumber Int      @default(1001)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  owner              User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  customers          Customer[]
+  items              Item[]
+  invoices           Invoice[]
+  estimates          Estimate[]
+  recurringTemplates RecurringTemplate[]
+  activityLogs       ActivityLog[]
+}
+
+model Customer {
+  id             String @id
+  workspaceId    String
+  name           String
+  company        String
+  email          String
+  phone          String
+  billingAddress String
+  notes          String
+
+  workspace          Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invoices           Invoice[]
+  estimates          Estimate[]
+  recurringTemplates RecurringTemplate[]
+
+  @@index([workspaceId])
+}
+
+model Item {
+  id              String @id
+  workspaceId     String
+  name            String
+  description     String
+  unitPriceMinor  Int
+  taxRateBps      Int
+  defaultQuantity Float
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model Invoice {
+  id                 String   @id
+  workspaceId        String
+  customerId         String
+  invoiceNumber      String
+  issueDate          DateTime
+  dueDate            DateTime
+  status             String
+  subtotalMinor      Int
+  taxTotalMinor      Int
+  discountTotalMinor Int
+  totalMinor         Int
+  currency           String
+  notes              String
+  terms              String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  workspace Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customer  Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  lineItems InvoiceLineItem[]
+  payments  Payment[]
+
+  @@unique([workspaceId, invoiceNumber])
+  @@index([workspaceId])
+  @@index([customerId])
+}
+
+model InvoiceLineItem {
+  id                String  @id
+  invoiceId         String
+  itemId            String?
+  position          Int
+  description       String
+  quantity          Float
+  unitPriceMinor    Int
+  taxRateBps        Int
+  discountMinor     Int
+  lineSubtotalMinor Int
+  lineTaxMinor      Int
+  lineTotalMinor    Int
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model Payment {
+  id          String   @id
+  invoiceId   String
+  amountMinor Int
+  paidAt      DateTime
+  method      String
+  note        String
+  createdAt   DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model Estimate {
+  id                 String   @id
+  workspaceId        String
+  customerId         String
+  estimateNumber     String
+  issueDate          DateTime
+  expiresDate        DateTime
+  status             String
+  subtotalMinor      Int
+  taxTotalMinor      Int
+  discountTotalMinor Int
+  totalMinor         Int
+  currency           String
+  notes              String
+  terms              String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customer  Customer           @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  lineItems EstimateLineItem[]
+
+  @@unique([workspaceId, estimateNumber])
+  @@index([workspaceId])
+  @@index([customerId])
+}
+
+model EstimateLineItem {
+  id                String  @id
+  estimateId        String
+  itemId            String?
+  position          Int
+  description       String
+  quantity          Float
+  unitPriceMinor    Int
+  taxRateBps        Int
+  discountMinor     Int
+  lineSubtotalMinor Int
+  lineTaxMinor      Int
+  lineTotalMinor    Int
+
+  estimate Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+
+  @@index([estimateId])
+}
+
+model RecurringTemplate {
+  id            String   @id
+  workspaceId   String
+  customerId    String
+  name          String
+  frequency     String
+  interval      Int
+  nextIssueDate DateTime
+  active        Boolean  @default(true)
+  currency      String
+  notes         String
+  terms         String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspace Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customer  Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  lineItems RecurringLineItem[]
+
+  @@index([workspaceId])
+  @@index([customerId])
+}
+
+model RecurringLineItem {
+  id                  String  @id
+  recurringTemplateId String
+  itemId              String?
+  position            Int
+  description         String
+  quantity            Float
+  unitPriceMinor      Int
+  taxRateBps          Int
+  discountMinor       Int
+  lineSubtotalMinor   Int
+  lineTaxMinor        Int
+  lineTotalMinor      Int
+
+  recurringTemplate RecurringTemplate @relation(fields: [recurringTemplateId], references: [id], onDelete: Cascade)
+
+  @@index([recurringTemplateId])
+}
+
+model ActivityLog {
+  id          String   @id
+  workspaceId String
+  entityType  String
+  entityId    String
+  action      String
+  details     String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+}

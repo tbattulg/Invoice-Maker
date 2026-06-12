@@ -1,0 +1,33 @@
+{
+  "name": "invoice-creator",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "npm run db:prepare && prisma generate && prisma migrate deploy",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "preview": "next start -p 3000",
+    "db:prepare": "node scripts/prepare-database.mjs",
+    "db:generate": "prisma generate",
+    "db:migrate": "npm run db:prepare && prisma migrate deploy",
+    "db:push": "prisma db push",
+    "check": "npm run typecheck && npm run build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "jspdf": "^4.2.1",
+    "lucide-react": "^0.468.0",
+    "next": "^15.3.4",
+    "prisma": "^6.19.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
+    "typescript": "^5.8.3"
+  }
+}
