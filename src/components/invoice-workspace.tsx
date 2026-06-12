@@ -55,6 +55,8 @@ import {
   calculateInvoiceTotals,
   calculateLineItem,
   createId,
+  discountMinorFromPercent,
+  discountRateBps,
   dollarsToMinor,
   formatCurrency,
   minorToDollars,
@@ -122,6 +124,40 @@ const emptyItemForm: ItemForm = {
   taxRate: "0",
   defaultQuantity: 1
 };
+
+function DecimalTextInput({
+  value,
+  onValueChange
+}: {
+  value: string;
+  onValueChange: (value: string) => void;
+}) {
+  const [inputValue, setInputValue] = useState(value);
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isFocused) setInputValue(value);
+  }, [isFocused, value]);
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={inputValue}
+      onFocus={(event) => {
+        setIsFocused(true);
+        event.currentTarget.select();
+      }}
+      onChange={(event) => {
+        const nextValue = event.target.value;
+        if (!/^\d*(\.\d*)?$/.test(nextValue)) return;
+        setInputValue(nextValue);
+        onValueChange(nextValue);
+      }}
+      onBlur={() => setIsFocused(false)}
+    />
+  );
+}
 
 function createBlankDraft(state: InvoiceCreatorState): DraftInvoice {
   const issueDate = todayInput();
@@ -290,16 +326,31 @@ export function InvoiceWorkspace({
       ...current,
       lineItems: current.lineItems.map((line) =>
         line.id === lineId
-          ? calculateLineItem({
-              ...line,
-              ...patch,
-              id: line.id,
-              description: patch.description ?? line.description,
-              quantity: patch.quantity ?? line.quantity,
-              unitPriceMinor: patch.unitPriceMinor ?? line.unitPriceMinor,
-              taxRateBps: patch.taxRateBps ?? line.taxRateBps,
-              discountMinor: patch.discountMinor ?? line.discountMinor
-            })
+          ? (() => {
+              const quantity = patch.quantity ?? line.quantity;
+              const unitPriceMinor = patch.unitPriceMinor ?? line.unitPriceMinor;
+              const lineSubtotalMinor = Math.round(quantity * unitPriceMinor);
+              const discountMinor =
+                patch.discountMinor ??
+                ((patch.quantity !== undefined || patch.unitPriceMinor !== undefined)
+                  ? Math.round(
+                      (lineSubtotalMinor *
+                        discountRateBps(line.lineSubtotalMinor, line.discountMinor)) /
+                        10000
+                    )
+                  : line.discountMinor);
+
+              return calculateLineItem({
+                ...line,
+                ...patch,
+                id: line.id,
+                description: patch.description ?? line.description,
+                quantity,
+                unitPriceMinor,
+                taxRateBps: patch.taxRateBps ?? line.taxRateBps,
+                discountMinor
+              });
+          })()
           : line
       )
     }));
@@ -669,9 +720,9 @@ export function InvoiceWorkspace({
                   {draft.lineItems.map((line) => <div className="line-row" key={line.id}>
                     <label className="line-description">Description<input value={line.description} onChange={(event) => updateLine(line.id, { description: event.target.value })} /></label>
                     <label>Qty<input type="number" min="0" step="0.01" value={line.quantity} onChange={(event) => updateLine(line.id, { quantity: Number(event.target.value) })} /></label>
-                    <label>Price<input type="number" min="0" step="0.01" value={minorToDollars(line.unitPriceMinor)} onChange={(event) => updateLine(line.id, { unitPriceMinor: dollarsToMinor(event.target.value) })} /></label>
-                    <label>Tax %<input type="number" min="0" step="0.01" value={bpsToPercent(line.taxRateBps)} onChange={(event) => updateLine(line.id, { taxRateBps: percentToBps(event.target.value) })} /></label>
-                    <label>Discount<input type="number" min="0" step="0.01" value={minorToDollars(line.discountMinor)} onChange={(event) => updateLine(line.id, { discountMinor: dollarsToMinor(event.target.value) })} /></label>
+                    <label>Price<DecimalTextInput value={minorToDollars(line.unitPriceMinor)} onValueChange={(value) => updateLine(line.id, { unitPriceMinor: Math.max(dollarsToMinor(value), 0) })} /></label>
+                    <label>Tax %<DecimalTextInput value={bpsToPercent(line.taxRateBps)} onValueChange={(value) => updateLine(line.id, { taxRateBps: Math.max(percentToBps(value), 0) })} /></label>
+                    <label>Discount %<DecimalTextInput value={bpsToPercent(discountRateBps(line.lineSubtotalMinor, line.discountMinor))} onValueChange={(value) => updateLine(line.id, { discountMinor: discountMinorFromPercent(line.lineSubtotalMinor, value) })} /></label>
                     <div className="line-total"><span>Total</span><strong>{formatCurrency(line.lineTotalMinor, state.settings.defaultCurrency)}</strong></div>
                     <button className="icon-button danger line-remove" type="button" title="Remove line" aria-label="Remove line item" onClick={() => setDraft((current) => ({ ...current, lineItems: current.lineItems.filter((entry) => entry.id !== line.id) }))}><Trash2 size={17} /></button>
                   </div>)}

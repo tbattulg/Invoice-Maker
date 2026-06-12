@@ -18,6 +18,19 @@ export function bpsToPercent(value: number): string {
   return (value / 100).toFixed(2).replace(/\.00$/, "");
 }
 
+export function discountRateBps(lineSubtotalMinor: number, discountMinor: number): number {
+  if (lineSubtotalMinor <= 0 || discountMinor <= 0) return 0;
+  return Math.min(Math.round((discountMinor * 10000) / lineSubtotalMinor), 10000);
+}
+
+export function discountMinorFromPercent(
+  lineSubtotalMinor: number,
+  value: string | number
+): number {
+  const rateBps = Math.min(Math.max(percentToBps(value), 0), 10000);
+  return Math.round((Math.max(lineSubtotalMinor, 0) * rateBps) / 10000);
+}
+
 export function formatCurrency(valueMinor: number, currency = "USD"): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
