@@ -1,0 +1,2 @@
+ALTER TABLE "Workspace" ADD COLUMN "logoDataUrl" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Invoice" ADD COLUMN "template" TEXT NOT NULL DEFAULT 'classic';

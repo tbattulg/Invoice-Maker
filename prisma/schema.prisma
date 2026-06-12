@@ -40,6 +40,7 @@ model Workspace {
   businessPhone     String   @default("")
   businessAddress   String   @default("")
   brandColor        String   @default("#176b5b")
+  logoDataUrl       String   @default("")
   defaultCurrency   String   @default("USD")
   defaultTerms      String   @default("")
   defaultNotes      String   @default("")
@@ -97,6 +98,7 @@ model Invoice {
   issueDate          DateTime
   dueDate            DateTime
   status             String
+  template           String   @default("classic")
   subtotalMinor      Int
   taxTotalMinor      Int
   discountTotalMinor Int

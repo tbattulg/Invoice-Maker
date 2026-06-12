@@ -10,6 +10,7 @@ import {
   FileSpreadsheet,
   FilePlus2,
   FileText,
+  ImagePlus,
   LayoutDashboard,
   LogOut,
   Package,
@@ -18,9 +19,10 @@ import {
   Search,
   Settings,
   Trash2,
-  UserRound
+  UserRound,
+  X
 } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   completeBusinessOnboarding,
   createInvoice as createInvoiceAction,
@@ -73,6 +75,7 @@ import type {
   InvoiceCreatorState,
   InvoiceLineItem,
   InvoiceStatus,
+  InvoiceTemplate,
   Item
 } from "@/features/invoices/types";
 
@@ -86,11 +89,21 @@ const STATUS_OPTIONS: InvoiceStatus[] = [
   "void"
 ];
 
+const INVOICE_TEMPLATES: Array<{
+  id: InvoiceTemplate;
+  name: string;
+  description: string;
+}> = [
+  { id: "classic", name: "Classic", description: "Balanced and familiar" },
+  { id: "modern", name: "Modern", description: "Bold branded header" },
+  { id: "minimal", name: "Minimal", description: "Clean and spacious" }
+];
+
 type View = "dashboard" | "builder" | "customers" | "items" | "settings";
 type StatusFilter = "all" | InvoiceStatus;
 type DraftInvoice = Pick<
   Invoice,
-  "customerId" | "issueDate" | "dueDate" | "status" | "notes" | "terms" | "lineItems"
+  "customerId" | "issueDate" | "dueDate" | "status" | "template" | "notes" | "terms" | "lineItems"
 >;
 type CustomerForm = Omit<Customer, "id">;
 type ItemForm = Omit<Item, "id" | "unitPriceMinor" | "taxRateBps"> & {
@@ -166,6 +179,7 @@ function createBlankDraft(state: InvoiceCreatorState): DraftInvoice {
     issueDate,
     dueDate: addDaysInput(issueDate, 14),
     status: "draft",
+    template: "classic",
     notes: state.settings.defaultNotes,
     terms: state.settings.defaultTerms,
     lineItems: [
@@ -521,6 +535,35 @@ export function InvoiceWorkspace({
     });
   }
 
+  function uploadBusinessLogo(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+    if (!new Set(["image/png", "image/jpeg"]).has(file.type)) {
+      showToast("error", "Unsupported logo format", "Choose a PNG or JPG image.");
+      input.value = "";
+      return;
+    }
+    if (file.size > 750 * 1024) {
+      showToast("error", "Logo is too large", "Choose an image smaller than 750 KB.");
+      input.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setSettingsForm((current) => ({ ...current, logoDataUrl: reader.result as string }));
+      }
+      input.value = "";
+    };
+    reader.onerror = () => {
+      showToast("error", "Logo could not be read", "Try another PNG or JPG image.");
+      input.value = "";
+    };
+    reader.readAsDataURL(file);
+  }
+
   async function submitSettings(event: FormEvent) {
     event.preventDefault();
     if (!activeUser) return;
@@ -701,7 +744,26 @@ export function InvoiceWorkspace({
                 <div className="inline-notice"><CircleAlert size={19} /><div><strong>A customer is required</strong><span>Add a billing contact before saving this invoice.</span></div><button className="secondary-button" type="button" onClick={() => setView("customers")}>Add customer</button></div>
               )}
               <div className="form-band">
-                <SectionHeading number="1" title="Invoice details" description="Choose who you are billing and set the invoice dates." />
+                <SectionHeading number="1" title="Choose a template" description="Pick the layout that best fits this invoice." />
+                <div className="template-picker">
+                  {INVOICE_TEMPLATES.map((template) => (
+                    <button
+                      aria-pressed={draft.template === template.id}
+                      className={`template-option${draft.template === template.id ? " selected" : ""}`}
+                      key={template.id}
+                      onClick={() => setDraft({ ...draft, template: template.id })}
+                      type="button"
+                    >
+                      <span className={`template-thumbnail template-thumbnail-${template.id}`}><i /><i /><i /></span>
+                      <strong>{template.name}</strong>
+                      <small>{template.description}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-band">
+                <SectionHeading number="2" title="Invoice details" description="Choose who you are billing and set the invoice dates." />
                 <div className="field-grid two">
                   <label>Customer<select value={draft.customerId} onChange={(event) => setDraft({ ...draft, customerId: event.target.value })}><option value="">Select customer</option>{state.customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.company || customer.name}</option>)}</select></label>
                   <label>Status<select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as InvoiceStatus })}>{STATUS_OPTIONS.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></label>
@@ -711,7 +773,7 @@ export function InvoiceWorkspace({
               </div>
 
               <div className="form-band">
-                <SectionHeading number="2" title="Line items" description="Add saved services or enter a one-time charge." />
+                <SectionHeading number="3" title="Line items" description="Add saved services or enter a one-time charge." />
                 <div className="line-toolbar">
                   <label>Saved item<select value={selectedItemId} onChange={(event) => setSelectedItemId(event.target.value)}><option value="">Choose an item</option>{state.items.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
                   <div className="line-toolbar-actions"><button className="secondary-button" type="button" disabled={!selectedItemId} onClick={addSelectedItem}><Plus size={17} />Add saved</button><button className="secondary-button" type="button" onClick={addBlankLine}><Plus size={17} />Custom line</button></div>
@@ -731,7 +793,7 @@ export function InvoiceWorkspace({
               </div>
 
               <div className="form-band">
-                <SectionHeading number="3" title="Notes and terms" description="Add payment instructions or a short message for your customer." />
+                <SectionHeading number="4" title="Notes and terms" description="Add payment instructions or a short message for your customer." />
                 <div className="field-grid two"><label>Notes<textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} /></label><label>Terms<textarea value={draft.terms} onChange={(event) => setDraft({ ...draft, terms: event.target.value })} /></label></div>
               </div>
               <div className="builder-actions"><button className="secondary-button" disabled={pendingAction === "invoice"} type="button" onClick={() => setView("dashboard")}>Cancel</button><button className="secondary-button" disabled={isBusy} type="button" onClick={() => saveInvoice(false)}>{pendingAction === "invoice" ? <LoadingLabel>Saving...</LoadingLabel> : "Save invoice"}</button><button className="primary-button" disabled={isBusy} type="button" onClick={() => saveInvoice(true)}>{pendingAction === "invoice" ? <LoadingLabel>Preparing PDF...</LoadingLabel> : <><Download size={18} />Save and download</>}</button></div>
@@ -785,7 +847,26 @@ export function InvoiceWorkspace({
 
         {view === "settings" && (
           <form className="settings-grid view-enter" onSubmit={submitSettings}>
-            <div className="editor-panel"><SectionHeading title="Business details" description="Shown in the header of every generated invoice." /><label>Business name<input required value={settingsForm.businessName} onChange={(event) => setSettingsForm({ ...settingsForm, businessName: event.target.value })} /></label><label>Billing email<input required type="email" value={settingsForm.businessEmail} onChange={(event) => setSettingsForm({ ...settingsForm, businessEmail: event.target.value })} /></label><label>Phone<input value={settingsForm.businessPhone} onChange={(event) => setSettingsForm({ ...settingsForm, businessPhone: event.target.value })} /></label><label>Address<textarea value={settingsForm.businessAddress} onChange={(event) => setSettingsForm({ ...settingsForm, businessAddress: event.target.value })} /></label></div>
+            <div className="editor-panel">
+              <SectionHeading title="Business details" description="Shown in the header of every generated invoice." />
+              <div className="logo-setting">
+                <div className={`logo-preview${settingsForm.logoDataUrl ? " has-image" : ""}`}>
+                  {settingsForm.logoDataUrl ? <img src={settingsForm.logoDataUrl} alt="Business logo preview" /> : <ImagePlus size={24} />}
+                </div>
+                <div className="logo-setting-copy">
+                  <strong>Business logo</strong>
+                  <span>PNG or JPG, up to 750 KB.</span>
+                  <div className="logo-actions">
+                    <label className="secondary-button logo-upload">{settingsForm.logoDataUrl ? "Replace logo" : "Upload logo"}<input accept="image/png,image/jpeg" type="file" onChange={uploadBusinessLogo} /></label>
+                    {settingsForm.logoDataUrl && <button className="icon-button danger" type="button" title="Remove logo" aria-label="Remove business logo" onClick={() => setSettingsForm({ ...settingsForm, logoDataUrl: "" })}><X size={17} /></button>}
+                  </div>
+                </div>
+              </div>
+              <label>Business name<input required value={settingsForm.businessName} onChange={(event) => setSettingsForm({ ...settingsForm, businessName: event.target.value })} /></label>
+              <label>Billing email<input required type="email" value={settingsForm.businessEmail} onChange={(event) => setSettingsForm({ ...settingsForm, businessEmail: event.target.value })} /></label>
+              <label>Phone<input value={settingsForm.businessPhone} onChange={(event) => setSettingsForm({ ...settingsForm, businessPhone: event.target.value })} /></label>
+              <label>Address<textarea value={settingsForm.businessAddress} onChange={(event) => setSettingsForm({ ...settingsForm, businessAddress: event.target.value })} /></label>
+            </div>
             <div className="editor-panel"><SectionHeading title="Invoice defaults" description="Applied automatically when you start a new invoice." /><div className="field-grid two"><label>Invoice prefix<input value={settingsForm.invoicePrefix} onChange={(event) => setSettingsForm({ ...settingsForm, invoicePrefix: event.target.value.toUpperCase() })} /></label><label>Next number<input type="number" min="1" value={settingsForm.nextInvoiceNumber} onChange={(event) => setSettingsForm({ ...settingsForm, nextInvoiceNumber: Number(event.target.value) || 1 })} /></label></div><div className="field-grid two"><label>Currency<select value={settingsForm.defaultCurrency} onChange={(event) => setSettingsForm({ ...settingsForm, defaultCurrency: event.target.value })}><option value="USD">USD</option><option value="CAD">CAD</option><option value="EUR">EUR</option><option value="GBP">GBP</option><option value="AUD">AUD</option></select></label><label>Brand color<input type="color" value={settingsForm.brandColor} onChange={(event) => setSettingsForm({ ...settingsForm, brandColor: event.target.value })} /></label></div><label>Default notes<textarea value={settingsForm.defaultNotes} onChange={(event) => setSettingsForm({ ...settingsForm, defaultNotes: event.target.value })} /></label><label>Default terms<textarea value={settingsForm.defaultTerms} onChange={(event) => setSettingsForm({ ...settingsForm, defaultTerms: event.target.value })} /></label></div>
             <div className="settings-actions"><button className="primary-button" disabled={isBusy} type="submit">{pendingAction === "settings" ? <LoadingLabel>Saving settings...</LoadingLabel> : "Save settings"}</button></div>
           </form>

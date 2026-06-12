@@ -7,6 +7,8 @@ export type InvoiceStatus =
   | "paid"
   | "void";
 
+export type InvoiceTemplate = "classic" | "modern" | "minimal";
+
 export type Customer = {
   id: string;
   name: string;
@@ -46,6 +48,7 @@ export type Invoice = {
   issueDate: string;
   dueDate: string;
   status: InvoiceStatus;
+  template: InvoiceTemplate;
   subtotalMinor: number;
   taxTotalMinor: number;
   discountTotalMinor: number;
@@ -122,6 +125,7 @@ export type BusinessSettings = {
   businessPhone: string;
   businessAddress: string;
   brandColor: string;
+  logoDataUrl: string;
   defaultCurrency: string;
   defaultTerms: string;
   defaultNotes: string;

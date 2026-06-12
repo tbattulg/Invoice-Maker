@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { BusinessSettings, Customer, Invoice } from "@/features/invoices/types";
 import { formatCurrency } from "@/features/invoices/calculations";
 
@@ -10,21 +11,23 @@ export function InvoiceDocument({
   customer?: Customer;
   settings: BusinessSettings;
 }) {
+  const style = { "--invoice-accent": settings.brandColor } as CSSProperties;
+
   return (
-    <article className="invoice-document">
+    <article className={`invoice-document invoice-template-${invoice.template}`} style={style}>
       <header className="invoice-doc-header">
         <div className="invoice-business">
-          <span className="doc-logo" style={{ backgroundColor: settings.brandColor }}>
-            {initials(settings.businessName)}
-          </span>
-          <h2>{settings.businessName}</h2>
-          <p>{settings.businessAddress}</p>
-          <p>{settings.businessEmail}</p>
-          <p>{settings.businessPhone}</p>
+          <Logo settings={settings} />
+          <div className="invoice-business-copy">
+            <h2>{settings.businessName}</h2>
+            <p>{settings.businessAddress}</p>
+            <p>{settings.businessEmail}</p>
+            <p>{settings.businessPhone}</p>
+          </div>
         </div>
         <div className="invoice-doc-meta">
           <strong>Invoice</strong>
-          <span style={{ color: settings.brandColor }}>{invoice.invoiceNumber}</span>
+          <span>{invoice.invoiceNumber}</span>
           <small>Issued {formatDate(invoice.issueDate)}</small>
           <small>Due {formatDate(invoice.dueDate)}</small>
         </div>
@@ -73,6 +76,18 @@ export function InvoiceDocument({
         </footer>
       )}
     </article>
+  );
+}
+
+function Logo({ settings }: { settings: BusinessSettings }) {
+  return (
+    <span className={`doc-logo${settings.logoDataUrl ? " has-image" : ""}`}>
+      {settings.logoDataUrl ? (
+        <img src={settings.logoDataUrl} alt={`${settings.businessName} logo`} />
+      ) : (
+        initials(settings.businessName)
+      )}
+    </span>
   );
 }
 

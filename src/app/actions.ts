@@ -22,6 +22,7 @@ import type {
   InvoiceCreatorState,
   InvoiceLineItem,
   InvoiceStatus,
+  InvoiceTemplate,
   Item,
   RecurringFrequency,
   RecurringTemplate
@@ -31,7 +32,7 @@ import { prisma } from "@/lib/prisma";
 type Transaction = Prisma.TransactionClient;
 type InvoiceDraftInput = Pick<
   Invoice,
-  "customerId" | "issueDate" | "dueDate" | "status" | "notes" | "terms" | "lineItems"
+  "customerId" | "issueDate" | "dueDate" | "status" | "template" | "notes" | "terms" | "lineItems"
 >;
 
 export type CustomerInput = Omit<Customer, "id"> & { id?: string };
@@ -72,6 +73,19 @@ function toDate(value: string) {
 
 function dateInput(value: Date) {
   return value.toISOString().slice(0, 10);
+}
+
+function invoiceTemplate(value: string): InvoiceTemplate {
+  return value === "modern" || value === "minimal" ? value : "classic";
+}
+
+function businessLogoDataUrl(value: string): string {
+  if (!value) return "";
+  if (value.length > 1_050_000) throw new Error("The business logo is too large.");
+  if (!/^data:image\/(?:png|jpeg);base64,[a-z0-9+/=]+$/i.test(value)) {
+    throw new Error("The business logo must be a PNG or JPG image.");
+  }
+  return value;
 }
 
 function normalizedLines(lines: InvoiceLineItem[]) {
@@ -229,6 +243,7 @@ async function readWorkspaceState(userId: string): Promise<InvoiceCreatorState> 
       businessPhone: workspace.businessPhone,
       businessAddress: workspace.businessAddress,
       brandColor: workspace.brandColor,
+      logoDataUrl: workspace.logoDataUrl,
       defaultCurrency: workspace.defaultCurrency,
       defaultTerms: workspace.defaultTerms,
       defaultNotes: workspace.defaultNotes,
@@ -263,6 +278,7 @@ async function readWorkspaceState(userId: string): Promise<InvoiceCreatorState> 
       issueDate: dateInput(invoice.issueDate),
       dueDate: dateInput(invoice.dueDate),
       status: invoice.status as InvoiceStatus,
+      template: invoiceTemplate(invoice.template),
       subtotalMinor: invoice.subtotalMinor,
       taxTotalMinor: invoice.taxTotalMinor,
       discountTotalMinor: invoice.discountTotalMinor,
@@ -419,6 +435,7 @@ export async function createInvoice(draft: InvoiceDraftInput) {
         issueDate: toDate(draft.issueDate),
         dueDate: toDate(draft.dueDate),
         status: draft.status,
+        template: invoiceTemplate(draft.template),
         currency: workspace.defaultCurrency,
         notes: draft.notes,
         terms: draft.terms,
@@ -452,6 +469,7 @@ export async function updateInvoice(invoice: Invoice) {
         issueDate: toDate(invoice.issueDate),
         dueDate: toDate(invoice.dueDate),
         status: invoice.status,
+        template: invoiceTemplate(invoice.template),
         currency: invoice.currency,
         notes: invoice.notes,
         terms: invoice.terms,
@@ -511,6 +529,7 @@ export async function duplicateInvoice(invoiceId: string) {
         issueDate,
         dueDate,
         status: "draft",
+        template: invoiceTemplate(source.template),
         subtotalMinor: source.subtotalMinor,
         taxTotalMinor: source.taxTotalMinor,
         discountTotalMinor: source.discountTotalMinor,
@@ -614,6 +633,7 @@ export async function saveSettings(settings: BusinessSettings) {
         businessPhone: settings.businessPhone,
         businessAddress: settings.businessAddress,
         brandColor: settings.brandColor,
+        logoDataUrl: businessLogoDataUrl(settings.logoDataUrl),
         defaultCurrency: settings.defaultCurrency,
         defaultTerms: settings.defaultTerms,
         defaultNotes: settings.defaultNotes,

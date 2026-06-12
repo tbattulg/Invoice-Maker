@@ -8,6 +8,8 @@ A focused local invoice workspace built with Next.js and TypeScript.
 - Reusable product and service items.
 - Invoice builder with quantity, price, tax, discount, totals, notes, and terms.
 - Invoice preview and print-ready PDF download.
+- Classic, modern, and minimal invoice templates saved per invoice.
+- Business logo upload with matching preview and PDF branding.
 - Searchable invoice dashboard.
 - Manual invoice statuses: draft, sent, unpaid, overdue, partially paid, paid, and void.
 - Business details, invoice numbering, currency, and brand color settings.
