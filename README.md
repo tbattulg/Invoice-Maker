@@ -48,3 +48,11 @@ Open `http://localhost:3000`.
 ```powershell
 npm.cmd run check
 ```
+
+## Deploy
+
+This app uses SQLite and must run on a long-lived server with a persistent disk. It is not suitable for an ephemeral serverless filesystem.
+
+The included Docker setup stores the database at `/data/invoice.db`, applies migrations when the container starts, and exposes a health check at `/api/health`.
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the deployment checklist and container commands.
