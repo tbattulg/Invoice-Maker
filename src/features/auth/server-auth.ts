@@ -1,7 +1,7 @@
 import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 
 const SESSION_COOKIE = "invoice-creator-session";
 const SESSION_LIFETIME_MS = 1000 * 60 * 60 * 24 * 30;
@@ -36,6 +36,7 @@ export async function verifyPassword(
 }
 
 export async function createSession(userId: string) {
+  const prisma = await getPrisma();
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + SESSION_LIFETIME_MS);
   await prisma.session.create({
@@ -57,6 +58,7 @@ export async function createSession(userId: string) {
 export async function getCurrentUser(): Promise<AuthUser | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
+  const prisma = await getPrisma();
   const session = await prisma.session.findUnique({
     where: { tokenHash: hashSessionToken(token) },
     include: { user: { select: { id: true, email: true } } }
@@ -75,6 +77,7 @@ export async function clearSession() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (token) {
+    const prisma = await getPrisma();
     await prisma.session.deleteMany({ where: { tokenHash: hashSessionToken(token) } });
   }
   cookieStore.delete(SESSION_COOKIE);

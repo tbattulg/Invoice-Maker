@@ -17,18 +17,18 @@ A focused local invoice workspace built with Next.js and TypeScript.
 - HTTP-only sessions and first-run business onboarding.
 - Separate settings, customers, items, invoices, numbering, and template defaults per account.
 - Excel customer-directory export with contact and billing information.
-- Prisma-backed SQLite persistence for business data.
+- Prisma-backed persistence with local SQLite and hosted Cloudflare D1.
 - Server actions for invoices, customers, items, payments, estimates, recurring templates, and activity logs.
 
 ## Deliberately Not Included
 
 - Payment processing or payment links.
 - Recurring-invoice scheduling and reminder delivery.
-- Hosted database deployment or cloud synchronization.
+- Automatic tax filing or accounting-platform synchronization.
 
 ## Account Storage
 
-Account credentials, sessions, and business records are stored in `prisma/dev.db`. Session tokens are kept in HTTP-only cookies, and every server action resolves the current account from that session before reading or writing workspace data.
+When run locally, account credentials, sessions, and business records are stored in `prisma/dev.db`. The hosted Cloudflare deployment uses D1 for business data and KV for uploaded logo images. Session tokens are kept in HTTP-only cookies, and every server action resolves the current account from that session before reading or writing workspace data.
 
 Reliable bulk email delivery is not included because it requires a server-side email provider and authenticated business-domain setup. The Customers screen provides an Excel export instead.
 
@@ -51,8 +51,8 @@ npm.cmd run check
 
 ## Deploy
 
-This app uses SQLite and must run on a long-lived server with a persistent disk. It is not suitable for an ephemeral serverless filesystem.
+The primary hosted deployment uses Cloudflare Workers through OpenNext, Cloudflare D1 for relational data, and Cloudflare KV for business logos.
 
-The included Docker setup stores the database at `/data/invoice.db`, applies migrations when the container starts, and exposes a health check at `/api/health`.
+Docker remains available for self-hosting. It stores the SQLite database at `/data/invoice.db`, applies migrations when the container starts, and exposes a health check at `/api/health`.
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for the deployment checklist and container commands.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for Cloudflare and container deployment instructions.

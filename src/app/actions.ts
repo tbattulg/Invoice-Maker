@@ -1,6 +1,6 @@
 "use server";
 
-import type { Prisma } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import {
   clearSession,
@@ -27,7 +27,12 @@ import type {
   RecurringFrequency,
   RecurringTemplate
 } from "@/features/invoices/types";
-import { prisma } from "@/lib/prisma";
+import {
+  persistBusinessLogo,
+  resolveBusinessLogo,
+  validateBusinessLogo
+} from "@/lib/business-logo";
+import { getPrisma, runPrismaTransaction } from "@/lib/prisma";
 
 type Transaction = Prisma.TransactionClient;
 type InvoiceDraftInput = Pick<
@@ -79,15 +84,6 @@ function invoiceTemplate(value: string): InvoiceTemplate {
   return value === "modern" || value === "minimal" ? value : "classic";
 }
 
-function businessLogoDataUrl(value: string): string {
-  if (!value) return "";
-  if (value.length > 7_100_000) throw new Error("The business logo must be smaller than 5 MB.");
-  if (!/^data:image\/(?:png|jpeg);base64,[a-z0-9+/=]+$/i.test(value)) {
-    throw new Error("The business logo must be a PNG or JPG image.");
-  }
-  return value;
-}
-
 function normalizedLines(lines: InvoiceLineItem[]) {
   return lines.map((line) =>
     calculateLineItem({
@@ -106,8 +102,9 @@ function lineData(lines: InvoiceLineItem[]) {
   return normalizedLines(lines).map((line, position) => ({ ...line, position }));
 }
 
-async function workspaceForUser(userId: string, tx: Transaction | typeof prisma = prisma) {
-  const workspace = await tx.workspace.findUnique({ where: { ownerId: userId } });
+async function workspaceForUser(userId: string, client?: Transaction | PrismaClient) {
+  const prisma = client ?? (await getPrisma());
+  const workspace = await prisma.workspace.findUnique({ where: { ownerId: userId } });
   if (!workspace) throw new Error("Workspace not found.");
   return workspace;
 }
@@ -142,7 +139,8 @@ async function logActivity(
 }
 
 async function createWorkspace(user: AuthUser, input: BusinessOnboardingInput) {
-  return prisma.$transaction(async (tx) => {
+  const prisma = await getPrisma();
+  return runPrismaTransaction(prisma, async (tx) => {
     const businessName = input.businessName.trim();
     if (!businessName) throw new Error("Business name is required.");
     if (businessName.length > 120) throw new Error("Business name is too long.");
@@ -185,6 +183,7 @@ async function createWorkspace(user: AuthUser, input: BusinessOnboardingInput) {
 }
 
 async function readWorkspaceState(userId: string): Promise<InvoiceCreatorState> {
+  const prisma = await getPrisma();
   const workspace = await prisma.workspace.findUnique({
     where: { ownerId: userId },
     include: {
@@ -243,7 +242,7 @@ async function readWorkspaceState(userId: string): Promise<InvoiceCreatorState> 
       businessPhone: workspace.businessPhone,
       businessAddress: workspace.businessAddress,
       brandColor: workspace.brandColor,
-      logoDataUrl: workspace.logoDataUrl,
+      logoDataUrl: await resolveBusinessLogo(workspace.logoDataUrl),
       defaultCurrency: workspace.defaultCurrency,
       defaultTerms: workspace.defaultTerms,
       defaultNotes: workspace.defaultNotes,
@@ -349,6 +348,7 @@ async function refresh(userId: string) {
 }
 
 export async function registerAccount(input: { email: string; password: string }): Promise<AuthSnapshot> {
+  const prisma = await getPrisma();
   const email = normalizeEmail(input.email);
   validateCredentials(email, input.password);
   const credentials = await createPasswordCredentials(input.password);
@@ -369,6 +369,7 @@ export async function registerAccount(input: { email: string; password: string }
 }
 
 export async function loginAccount(input: { email: string; password: string }): Promise<AuthSnapshot> {
+  const prisma = await getPrisma();
   const email = normalizeEmail(input.email);
   const userRecord = await prisma.user.findUnique({ where: { email } });
   const valid =
@@ -392,11 +393,13 @@ export async function logoutAccount() {
 export async function getInitialSession(): Promise<AuthSnapshot | null> {
   const user = await getCurrentUser();
   if (!user) return null;
+  const prisma = await getPrisma();
   const workspace = await prisma.workspace.findUnique({ where: { ownerId: user.id } });
   return { user, state: workspace ? await readWorkspaceState(user.id) : null };
 }
 
 export async function getInitialAppState() {
+  const prisma = await getPrisma();
   const [initialSession, accountCount] = await Promise.all([
     getInitialSession(),
     prisma.user.count()
@@ -406,6 +409,7 @@ export async function getInitialAppState() {
 
 export async function completeBusinessOnboarding(input: BusinessOnboardingInput) {
   const user = await requireCurrentUser();
+  const prisma = await getPrisma();
   const existing = await prisma.workspace.findUnique({ where: { ownerId: user.id } });
   if (!existing) await createWorkspace(user, input);
   return refresh(user.id);
@@ -419,8 +423,9 @@ function validateCredentials(email: string, password: string) {
 
 export async function createInvoice(draft: InvoiceDraftInput) {
   const user = await requireCurrentUser();
+  const prisma = await getPrisma();
   const invoiceId = createId("inv");
-  await prisma.$transaction(async (tx) => {
+  await runPrismaTransaction(prisma, async (tx) => {
     const workspace = await workspaceForUser(user.id, tx);
     await requireWorkspaceCustomer(tx, workspace.id, draft.customerId);
     const lines = lineData(draft.lineItems);
@@ -457,7 +462,8 @@ export async function createInvoice(draft: InvoiceDraftInput) {
 
 export async function updateInvoice(invoice: Invoice) {
   const user = await requireCurrentUser();
-  await prisma.$transaction(async (tx) => {
+  const prisma = await getPrisma();
+  await runPrismaTransaction(prisma, async (tx) => {
     const workspace = await workspaceForUser(user.id, tx);
     await requireWorkspaceCustomer(tx, workspace.id, invoice.customerId);
     const lines = lineData(invoice.lineItems);
@@ -488,7 +494,8 @@ export async function updateInvoice(invoice: Invoice) {
 
 export async function updateInvoiceStatus(invoiceId: string, status: InvoiceStatus) {
   const user = await requireCurrentUser();
-  await prisma.$transaction(async (tx) => {
+  const prisma = await getPrisma();
+  await runPrismaTransaction(prisma, async (tx) => {
     const workspace = await workspaceForUser(user.id, tx);
     const invoice = await tx.invoice.findFirst({ where: { id: invoiceId, workspaceId: workspace.id } });
     if (!invoice) throw new Error("Invoice not found.");
@@ -507,7 +514,8 @@ export async function updateInvoiceStatus(invoiceId: string, status: InvoiceStat
 
 export async function duplicateInvoice(invoiceId: string) {
   const user = await requireCurrentUser();
-  await prisma.$transaction(async (tx) => {
+  const prisma = await getPrisma();
+  await runPrismaTransaction(prisma, async (tx) => {
     const workspace = await workspaceForUser(user.id, tx);
     const source = await tx.invoice.findFirst({
       where: { id: invoiceId, workspaceId: workspace.id },
@@ -562,7 +570,8 @@ export async function duplicateInvoice(invoiceId: string) {
 
 export async function deleteInvoice(invoiceId: string) {
   const user = await requireCurrentUser();
-  await prisma.$transaction(async (tx) => {
+  const prisma = await getPrisma();
+  await runPrismaTransaction(prisma, async (tx) => {
     const workspace = await workspaceForUser(user.id, tx);
     const invoice = await tx.invoice.findFirst({ where: { id: invoiceId, workspaceId: workspace.id } });
     if (!invoice) throw new Error("Invoice not found.");
@@ -574,7 +583,8 @@ export async function deleteInvoice(invoiceId: string) {
 
 export async function saveCustomer(input: CustomerInput) {
   const user = await requireCurrentUser();
-  await prisma.$transaction(async (tx) => {
+  const prisma = await getPrisma();
+  await runPrismaTransaction(prisma, async (tx) => {
     const workspace = await workspaceForUser(user.id, tx);
     const data = {
       name: input.name.trim(),
@@ -599,7 +609,8 @@ export async function saveCustomer(input: CustomerInput) {
 
 export async function saveItem(input: ItemInput) {
   const user = await requireCurrentUser();
-  await prisma.$transaction(async (tx) => {
+  const prisma = await getPrisma();
+  await runPrismaTransaction(prisma, async (tx) => {
     const workspace = await workspaceForUser(user.id, tx);
     const data = {
       name: input.name.trim(),
@@ -623,8 +634,11 @@ export async function saveItem(input: ItemInput) {
 
 export async function saveSettings(settings: BusinessSettings) {
   const user = await requireCurrentUser();
+  const prisma = await getPrisma();
   const workspace = await workspaceForUser(user.id);
-  await prisma.$transaction(async (tx) => {
+  const logoDataUrl = validateBusinessLogo(settings.logoDataUrl);
+  const storedLogo = await persistBusinessLogo(workspace.id, logoDataUrl);
+  await runPrismaTransaction(prisma, async (tx) => {
     await tx.workspace.update({
       where: { id: workspace.id },
       data: {
@@ -633,7 +647,7 @@ export async function saveSettings(settings: BusinessSettings) {
         businessPhone: settings.businessPhone,
         businessAddress: settings.businessAddress,
         brandColor: settings.brandColor,
-        logoDataUrl: businessLogoDataUrl(settings.logoDataUrl),
+        logoDataUrl: storedLogo,
         defaultCurrency: settings.defaultCurrency,
         defaultTerms: settings.defaultTerms,
         defaultNotes: settings.defaultNotes,
@@ -643,12 +657,15 @@ export async function saveSettings(settings: BusinessSettings) {
     });
     await logActivity(tx, workspace.id, "workspace", workspace.id, "updated", "Updated business settings");
   });
-  return refresh(user.id);
+  const state = await refresh(user.id);
+  state.settings.logoDataUrl = logoDataUrl;
+  return state;
 }
 
 export async function recordPayment(input: PaymentInput) {
   const user = await requireCurrentUser();
-  await prisma.$transaction(async (tx) => {
+  const prisma = await getPrisma();
+  await runPrismaTransaction(prisma, async (tx) => {
     const workspace = await workspaceForUser(user.id, tx);
     const invoice = await tx.invoice.findFirst({
       where: { id: input.invoiceId, workspaceId: workspace.id },
@@ -678,7 +695,8 @@ export async function recordPayment(input: PaymentInput) {
 
 export async function saveEstimate(input: EstimateInput) {
   const user = await requireCurrentUser();
-  await prisma.$transaction(async (tx) => {
+  const prisma = await getPrisma();
+  await runPrismaTransaction(prisma, async (tx) => {
     const workspace = await workspaceForUser(user.id, tx);
     await requireWorkspaceCustomer(tx, workspace.id, input.customerId);
     const lines = lineData(input.lineItems);
@@ -711,7 +729,8 @@ export async function saveEstimate(input: EstimateInput) {
 
 export async function saveRecurringTemplate(input: RecurringTemplateInput) {
   const user = await requireCurrentUser();
-  await prisma.$transaction(async (tx) => {
+  const prisma = await getPrisma();
+  await runPrismaTransaction(prisma, async (tx) => {
     const workspace = await workspaceForUser(user.id, tx);
     await requireWorkspaceCustomer(tx, workspace.id, input.customerId);
     const lines = lineData(input.lineItems);
@@ -745,7 +764,8 @@ export async function appendActivityLog(
   input: { entityType: string; entityId: string; action: string; details: string }
 ) {
   const user = await requireCurrentUser();
-  await prisma.$transaction(async (tx) => {
+  const prisma = await getPrisma();
+  await runPrismaTransaction(prisma, async (tx) => {
     const workspace = await workspaceForUser(user.id, tx);
     await logActivity(
       tx,

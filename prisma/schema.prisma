@@ -1,5 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+generator localClient {
+  provider   = "prisma-client-js"
+  output     = "../node_modules/.prisma/local-client"
+  engineType = "library"
 }
 
 datasource db {

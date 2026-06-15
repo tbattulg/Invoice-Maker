@@ -1,16 +1,39 @@
 # Deployment
 
-## Hosting Requirements
+## Cloudflare Workers
 
-- A long-running Docker container or Node.js server.
-- Exactly one running application instance; disable horizontal autoscaling.
-- A persistent disk mounted at `/data`.
-- HTTPS at the public endpoint so production session cookies remain secure.
-- Node.js 22 when deploying without Docker.
+The hosted version uses:
 
-Do not deploy this SQLite configuration to an ephemeral serverless filesystem. Accounts, sessions, invoices, and logos are stored in the database file and require durable storage.
+- Cloudflare Workers for the Next.js application.
+- Cloudflare D1 database `invoice-creator-production` for accounts and invoice records.
+- Cloudflare KV namespace `invoice-creator-logos` for uploaded business logos.
+- The free `workers.dev` HTTPS address for secure production sessions.
+
+Build and verify the Worker bundle:
+
+```powershell
+npm.cmd run cf:build
+```
+
+Apply pending D1 migrations, then deploy:
+
+```powershell
+npm.cmd run cf:migrate
+npm.cmd run cf:deploy
+```
+
+For a local Cloudflare preview, apply the local D1 migrations and run:
+
+```powershell
+npm.cmd run cf:migrate:local
+npm.cmd run cf:preview
+```
+
+Run `npm.cmd run cf:typegen` after changing bindings in `wrangler.jsonc`.
 
 ## Docker
+
+Docker is the self-hosted alternative. It requires one long-running instance and a persistent disk mounted at `/data`.
 
 Build the image:
 
@@ -52,8 +75,9 @@ The start command applies pending migrations and regenerates the Prisma client b
 ## Release Checklist
 
 1. Run `npm.cmd run check`.
-2. Confirm the deployment has a persistent disk mounted at `/data`.
-3. Confirm the public URL uses HTTPS.
-4. Confirm `/api/health` returns `{"status":"ok"}`.
-5. Create an account, save an invoice, restart the container, and verify the invoice still exists.
-6. Back up the persistent SQLite database before schema upgrades or host migrations.
+2. Run `npm.cmd run cf:build` for Cloudflare releases.
+3. Apply D1 migrations before publishing a new Worker version.
+4. Confirm the public URL uses HTTPS.
+5. Confirm `/api/health` returns `{"status":"ok"}`.
+6. Create an account, upload a logo, and save an invoice using each template.
+7. For Docker releases, confirm `/data` is persistent and back up the SQLite database before schema upgrades.
