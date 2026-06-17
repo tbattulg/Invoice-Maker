@@ -39,6 +39,7 @@ import {
   type BusinessOnboardingInput
 } from "@/app/actions";
 import { downloadCustomersExcel } from "@/features/customers/excel";
+import { AppLogoMark } from "@/components/app-logo";
 import { AuthScreen, OnboardingScreen } from "@/components/auth-flow";
 import { InvoiceDocument } from "@/components/invoice-document";
 import {
@@ -657,7 +658,7 @@ export function InvoiceWorkspace({
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand-lockup">
-          <span className="brand-mark"><FileText size={22} /></span>
+          <span className="brand-mark"><AppLogoMark /></span>
           <div><strong>Invoice Creator</strong><span>Business workspace</span></div>
         </div>
         <nav className="nav-list" aria-label="Main navigation">

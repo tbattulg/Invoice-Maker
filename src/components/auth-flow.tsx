@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import type { BusinessOnboardingInput } from "@/app/actions";
+import { AppLogoMark } from "@/components/app-logo";
 import { LoadingLabel } from "@/components/workspace-ui";
 
 export function AuthScreen({
@@ -195,7 +196,7 @@ function AuthLayout({
       <section className="auth-intro">
         <div className="auth-orb auth-orb-one" />
         <div className="auth-orb auth-orb-two" />
-        <div className="auth-brand"><span className="brand-mark"><FileText size={24} /></span><strong>Invoice Creator</strong></div>
+        <div className="auth-brand"><span className="brand-mark"><AppLogoMark /></span><strong>Invoice Creator</strong></div>
         <div className="auth-copy">
           <p className="eyebrow">{eyebrow}</p>
           <h1>{title}</h1>

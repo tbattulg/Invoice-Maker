@@ -79,7 +79,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .brand-lockup strong, .brand-lockup span { display: block; }
 .brand-lockup strong { overflow-wrap: anywhere; }
 .brand-lockup span { color: #bac8c5; font-size: 13px; margin-top: 2px; }
-.brand-mark { align-items: center; background: #f7faf9; border-radius: 8px; color: var(--nav) !important; display: grid !important; flex: 0 0 42px; height: 42px; justify-items: center; margin: 0 !important; width: 42px; }
+.brand-mark { align-items: center; background: transparent; border-radius: 12px; color: var(--nav) !important; display: grid !important; flex: 0 0 42px; height: 42px; justify-items: center; margin: 0 !important; width: 42px; }
+.site-logo-mark { display: block; filter: drop-shadow(0 6px 14px rgba(0,0,0,.18)); height: 42px; width: 42px; }
 .nav-list { display: grid; gap: 6px; }
 .nav-button {
   align-items: center;
@@ -394,7 +395,7 @@ input[type="color"] { padding: 5px; }
 
 .sidebar { background: linear-gradient(180deg, #17211f 0%, #14201e 100%); box-shadow: 8px 0 30px rgba(17, 32, 29, .06); position: relative; z-index: 2; }
 .brand-lockup { padding-block: 4px; }
-.brand-mark { box-shadow: 0 6px 18px rgba(0,0,0,.13); }
+.brand-mark { box-shadow: none; }
 .nav-list { gap: 4px; }
 .nav-button { border-radius: 9px; position: relative; }
 .nav-button::before { background: #7dc4b5; border-radius: 3px; content: ""; height: 18px; left: -7px; opacity: 0; position: absolute; transform: scaleY(.4); transition: 160ms ease; width: 3px; }
