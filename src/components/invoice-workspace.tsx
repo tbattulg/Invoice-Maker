@@ -5,6 +5,7 @@ import {
   Building2,
   CheckCircle2,
   CircleAlert,
+  ClipboardList,
   Copy,
   Download,
   FileSpreadsheet,
@@ -16,6 +17,7 @@ import {
   Package,
   Pencil,
   Plus,
+  Repeat2,
   Search,
   Settings,
   Trash2,
@@ -42,6 +44,10 @@ import { downloadCustomersExcel } from "@/features/customers/excel";
 import { AppLogoMark } from "@/components/app-logo";
 import { AuthScreen, OnboardingScreen } from "@/components/auth-flow";
 import { InvoiceDocument } from "@/components/invoice-document";
+import {
+  EstimateWorkspaceView,
+  RecurringTemplatesWorkspaceView
+} from "@/components/workspace-documents";
 import {
   ConfirmDialog,
   EmptyState,
@@ -100,7 +106,7 @@ const INVOICE_TEMPLATES: Array<{
   { id: "minimal", name: "Minimal", description: "Clean and spacious" }
 ];
 
-type View = "dashboard" | "builder" | "customers" | "items" | "settings";
+type View = "dashboard" | "builder" | "estimates" | "recurring" | "customers" | "items" | "settings";
 type StatusFilter = "all" | InvoiceStatus;
 type DraftInvoice = Pick<
   Invoice,
@@ -227,7 +233,7 @@ export function InvoiceWorkspace({
 
   useEffect(() => {
     const requestedView = new URLSearchParams(window.location.search).get("view");
-    if (["dashboard", "builder", "customers", "items", "settings"].includes(requestedView ?? "")) {
+    if (["dashboard", "builder", "estimates", "recurring", "customers", "items", "settings"].includes(requestedView ?? "")) {
       setView(requestedView as View);
     }
   }, []);
@@ -629,6 +635,8 @@ export function InvoiceWorkspace({
   const viewMeta = {
     dashboard: { title: "Invoices", description: "Track drafts, payments, and customer activity." },
     builder: { title: "New invoice", description: "Build a clear, professional invoice and preview it live." },
+    estimates: { title: "Estimates", description: "Create proposals, track approvals, and reuse saved line items." },
+    recurring: { title: "Recurring templates", description: "Manage repeat invoice templates and upcoming issue dates." },
     customers: { title: "Customers", description: "Keep billing contacts and addresses ready for reuse." },
     items: { title: "Items", description: "Save the products and services you bill most often." },
     settings: { title: "Settings", description: "Manage business details and invoice defaults." }
@@ -664,6 +672,8 @@ export function InvoiceWorkspace({
         <nav className="nav-list" aria-label="Main navigation">
           <NavButton active={view === "dashboard"} icon={<LayoutDashboard size={18} />} onClick={() => setView("dashboard")}>Invoices</NavButton>
           <NavButton active={view === "builder"} icon={<FilePlus2 size={18} />} onClick={openBuilder}>New invoice</NavButton>
+          <NavButton active={view === "estimates"} icon={<ClipboardList size={18} />} onClick={() => setView("estimates")}>Estimates</NavButton>
+          <NavButton active={view === "recurring"} icon={<Repeat2 size={18} />} onClick={() => setView("recurring")}>Recurring</NavButton>
           <NavButton active={view === "customers"} icon={<UserRound size={18} />} onClick={() => setView("customers")}>Customers</NavButton>
           <NavButton active={view === "items"} icon={<Package size={18} />} onClick={() => setView("items")}>Items</NavButton>
           <NavButton active={view === "settings"} icon={<Settings size={18} />} onClick={() => setView("settings")}>Settings</NavButton>
@@ -681,7 +691,7 @@ export function InvoiceWorkspace({
           <div className="topbar-copy"><p className="eyebrow">Invoice workspace</p><h1>{viewMeta.title}</h1><p>{viewMeta.description}</p></div>
           <div className="topbar-actions">
             {view === "customers" && <button className="secondary-button" disabled={!state.customers.length} onClick={() => downloadCustomersExcel(state.customers, state.settings.businessName)}><FileSpreadsheet size={18} />Export customers</button>}
-            {view !== "builder" && <button className="primary-button" onClick={openBuilder}><Plus size={18} />New invoice</button>}
+            {!["builder", "estimates", "recurring"].includes(view) && <button className="primary-button" onClick={openBuilder}><Plus size={18} />New invoice</button>}
           </div>
         </header>
 
@@ -803,6 +813,34 @@ export function InvoiceWorkspace({
               <InvoiceDocument invoice={{ id: "preview", invoiceNumber: `${state.settings.invoicePrefix}-${state.settings.nextInvoiceNumber}`, currency: state.settings.defaultCurrency, createdAt: "", updatedAt: "", ...draft, ...totals }} customer={customersById[draft.customerId]} settings={state.settings} />
             </aside>
           </section>
+        )}
+
+        {view === "estimates" && (
+          <EstimateWorkspaceView
+            customersById={customersById}
+            onAddCustomer={() => setView("customers")}
+            onStateChange={(nextState) => {
+              setState(nextState);
+              setSettingsForm(nextState.settings);
+            }}
+            showError={showError}
+            showToast={showToast}
+            state={state}
+          />
+        )}
+
+        {view === "recurring" && (
+          <RecurringTemplatesWorkspaceView
+            customersById={customersById}
+            onAddCustomer={() => setView("customers")}
+            onStateChange={(nextState) => {
+              setState(nextState);
+              setSettingsForm(nextState.settings);
+            }}
+            showError={showError}
+            showToast={showToast}
+            state={state}
+          />
         )}
 
         {view === "customers" && (
