@@ -9,6 +9,21 @@ The hosted version uses:
 - Cloudflare KV namespace `invoice-creator-logos` for uploaded business logos.
 - The free `workers.dev` HTTPS address for secure production sessions.
 
+### GitHub deployment
+
+Pushes to `main` deploy automatically after the CI job succeeds. Configure the
+`production` GitHub environment with these repository secrets:
+
+- `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account that owns the Worker.
+- `CLOUDFLARE_API_TOKEN`: a narrowly scoped token that can deploy Workers and
+  apply migrations to the configured D1 database.
+
+Pull requests build the OpenNext Worker but never receive Cloudflare credentials.
+Use required reviewers on the `production` environment if deployments need a
+manual approval gate.
+
+### Local deployment
+
 Build and verify the Worker bundle:
 
 ```powershell

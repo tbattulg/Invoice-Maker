@@ -3,10 +3,18 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: verify-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -20,8 +28,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run application checks
-        run: npm run check
+      - name: Check TypeScript
+        run: npm run typecheck
+
+      - name: Build Cloudflare Worker
+        run: npm run cf:build
 
       - name: Build deployment image
         run: docker build --tag invoice-creator:ci .
@@ -41,3 +52,34 @@ jobs:
           done
 
           exit 1
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    concurrency:
+      group: cloudflare-production
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply D1 migrations
+        run: npm run cf:migrate
+
+      - name: Build and deploy Cloudflare Worker
+        run: npm run cf:deploy
