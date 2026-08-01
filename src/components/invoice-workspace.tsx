@@ -24,6 +24,7 @@ import {
   UserRound,
   X
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   completeBusinessOnboarding,
@@ -40,14 +41,9 @@ import {
   type AuthSnapshot,
   type BusinessOnboardingInput
 } from "@/app/actions";
-import { downloadCustomersExcel } from "@/features/customers/excel";
 import { AppLogoMark } from "@/components/app-logo";
 import { AuthScreen, OnboardingScreen } from "@/components/auth-flow";
 import { InvoiceDocument } from "@/components/invoice-document";
-import {
-  EstimateWorkspaceView,
-  RecurringTemplatesWorkspaceView
-} from "@/components/workspace-documents";
 import {
   ConfirmDialog,
   EmptyState,
@@ -73,7 +69,6 @@ import {
   statusLabel,
   todayInput
 } from "@/features/invoices/calculations";
-import { downloadInvoicePdf } from "@/features/invoices/pdf";
 import { seedState } from "@/features/invoices/seed";
 import type {
   BusinessSettings,
@@ -85,6 +80,13 @@ import type {
   InvoiceTemplate,
   Item
 } from "@/features/invoices/types";
+
+const EstimateWorkspaceView = dynamic(() =>
+  import("@/components/workspace-documents").then((module) => module.EstimateWorkspaceView)
+);
+const RecurringTemplatesWorkspaceView = dynamic(() =>
+  import("@/components/workspace-documents").then((module) => module.RecurringTemplatesWorkspaceView)
+);
 
 const STATUS_OPTIONS: InvoiceStatus[] = [
   "draft",
@@ -294,6 +296,22 @@ export function InvoiceWorkspace({
     showToast("error", "Something went wrong", error instanceof Error ? error.message : fallback);
   }
 
+  async function downloadPdf(
+    input: Parameters<typeof import("@/features/invoices/pdf")["downloadInvoicePdf"]>[0]
+  ) {
+    const { downloadInvoicePdf } = await import("@/features/invoices/pdf");
+    downloadInvoicePdf(input);
+  }
+
+  async function exportCustomers() {
+    try {
+      const { downloadCustomersExcel } = await import("@/features/customers/excel");
+      downloadCustomersExcel(state.customers, state.settings.businessName);
+    } catch (error) {
+      showError(error, "Unable to export customers.");
+    }
+  }
+
   function openBuilder() {
     if (!state.customers.length) {
       showToast("error", "Add a customer first", "Invoices need a customer before they can be created.");
@@ -394,7 +412,7 @@ export function InvoiceWorkspace({
       setState(result.state);
       setSettingsForm(result.state.settings);
       if (downloadAfterSave) {
-        downloadInvoicePdf({
+        await downloadPdf({
           invoice: result.invoice,
           customer: result.state.customers.find(
             (customer) => customer.id === result.invoice.customerId
@@ -690,7 +708,7 @@ export function InvoiceWorkspace({
         <header className="topbar">
           <div className="topbar-copy"><p className="eyebrow">Invoice workspace</p><h1>{viewMeta.title}</h1><p>{viewMeta.description}</p></div>
           <div className="topbar-actions">
-            {view === "customers" && <button className="secondary-button" disabled={!state.customers.length} onClick={() => downloadCustomersExcel(state.customers, state.settings.businessName)}><FileSpreadsheet size={18} />Export customers</button>}
+            {view === "customers" && <button className="secondary-button" disabled={!state.customers.length} onClick={() => void exportCustomers()}><FileSpreadsheet size={18} />Export customers</button>}
             {!["builder", "estimates", "recurring"].includes(view) && <button className="primary-button" onClick={openBuilder}><Plus size={18} />New invoice</button>}
           </div>
         </header>
@@ -733,7 +751,7 @@ export function InvoiceWorkspace({
                           <td><strong>{formatCurrency(invoice.totalMinor, invoice.currency)}</strong></td>
                           <td><select disabled={isBusy} aria-busy={statusBusy} aria-label={`Status for ${invoice.invoiceNumber}`} className={`status-select status-${invoice.status}`} value={invoice.status} onChange={(event) => updateInvoiceStatus(invoice.id, event.target.value as InvoiceStatus)}>{STATUS_OPTIONS.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></td>
                           <td><div className="row-actions">
-                            <button className="icon-button" title="Download PDF" aria-label={`Download ${invoice.invoiceNumber} PDF`} type="button" onClick={() => downloadInvoicePdf({ invoice, customer, settings: state.settings })}><Download size={17} /></button>
+                            <button className="icon-button" title="Download PDF" aria-label={`Download ${invoice.invoiceNumber} PDF`} type="button" onClick={() => void downloadPdf({ invoice, customer, settings: state.settings }).catch((error) => showError(error, "Unable to create PDF."))}><Download size={17} /></button>
                             <button disabled={isBusy} className="icon-button" title="Duplicate invoice" aria-label={`Duplicate ${invoice.invoiceNumber}`} type="button" onClick={() => duplicateInvoice(invoice)}><Copy size={17} /></button>
                             <button disabled={isBusy} className="icon-button danger" title="Delete invoice" aria-label={`Delete ${invoice.invoiceNumber}`} type="button" onClick={() => setInvoiceToDelete(invoice)}><Trash2 size={17} /></button>
                           </div></td>

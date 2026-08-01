@@ -4,9 +4,7 @@ import {
   Building2,
   Eye,
   EyeOff,
-  FileSpreadsheet,
   FileText,
-  LockKeyhole,
   ShieldCheck
 } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
@@ -62,14 +60,8 @@ export function AuthScreen({
 
   return (
     <AuthLayout
-      eyebrow="Focused invoicing for small businesses"
-      title="Professional invoices, without the accounting-suite overhead."
-      description="Keep customers, services, invoices, and business settings organized in one private workspace."
-      points={[
-        { icon: <ShieldCheck size={20} />, label: "Separate data for every account" },
-        { icon: <LockKeyhole size={20} />, label: "Secure, server-managed sign-in" },
-        { icon: <FileSpreadsheet size={20} />, label: "PDF invoices and customer exports" }
-      ]}
+      title="Simple invoicing for small businesses."
+      description="Create professional invoices and keep customer details in one place."
     >
       <form className="auth-form" onSubmit={submit}>
         <div className="auth-mode" role="tablist" aria-label="Account access">
@@ -182,13 +174,13 @@ function AuthLayout({
   eyebrow,
   title,
   description,
-  points,
+  points = [],
   children
 }: {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
   description: string;
-  points: Array<{ icon: ReactNode; label: string }>;
+  points?: Array<{ icon: ReactNode; label: string }>;
   children: ReactNode;
 }) {
   return (
@@ -198,13 +190,15 @@ function AuthLayout({
         <div className="auth-orb auth-orb-two" />
         <div className="auth-brand"><span className="brand-mark"><AppLogoMark /></span><strong>Invoice Creator</strong></div>
         <div className="auth-copy">
-          <p className="eyebrow">{eyebrow}</p>
+          {eyebrow && <p className="eyebrow">{eyebrow}</p>}
           <h1>{title}</h1>
           <p>{description}</p>
         </div>
-        <div className="auth-points">
-          {points.map((point) => <div key={point.label}>{point.icon}<span>{point.label}</span></div>)}
-        </div>
+        {points.length > 0 && (
+          <div className="auth-points">
+            {points.map((point) => <div key={point.label}>{point.icon}<span>{point.label}</span></div>)}
+          </div>
+        )}
       </section>
       <section className="auth-form-wrap">{children}</section>
     </main>
